@@ -4,59 +4,109 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weather Dashboard</title>
-    <!-- Use Google Fonts (Inter) for premium typography -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <meta name="description" content="A beautiful weather dashboard with hourly and 5-day forecasts.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
+    <div class="app-container" id="app-container">
+        <!-- Search Header -->
         <header class="header">
             <div class="search-bar">
-                <input type="text" id="city-input" placeholder="Search a place...">
-                <button id="search-btn" aria-label="Search">🔍</button>
+                <svg class="search-icon" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                </svg>
+                <input type="text" id="city-input" placeholder="Search city...">
+                <button id="search-btn" aria-label="Search">Search</button>
             </div>
             <button id="current-location-btn" class="location-btn">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
                 </svg>
-                Current Location
+                Use Current Location
             </button>
         </header>
 
-        <main class="weather-content" id="weather-content">
-            <!-- Loading state or initial message will be shown here -->
-            <div class="initial-msg">Type a city or use current location to get weather.</div>
-            
-            <!-- Weather data card, initially hidden -->
-            <div class="weather-card hidden" id="weather-card">
-                <h1 id="city-name" class="city-name">--</h1>
-                <div class="weather-main">
-                    <img id="weather-icon" src="" alt="Weather Icon" class="weather-icon">
-                    <div class="temp-box">
-                        <span id="temperature" class="temperature">--</span><span class="unit">°C</span>
-                    </div>
+        <!-- Initial / Loading / Error Message -->
+        <div class="initial-msg" id="initial-msg">Search a city or use your current location to see the weather.</div>
+
+        <!-- All Weather Content (hidden initially) -->
+        <div class="weather-all hidden" id="weather-all">
+
+            <!-- Hero Section: City, Temp, Description, Hi/Lo -->
+            <section class="hero-section" id="hero-section">
+                <h1 id="city-name" class="hero-city">--</h1>
+                <p id="temperature" class="hero-temp">--°</p>
+                <p id="weather-description" class="hero-desc">--</p>
+                <p id="min-max-temp" class="hero-hilo">H:--° L:--°</p>
+            </section>
+
+            <!-- Hourly Forecast Strip -->
+            <section class="card hourly-card" id="hourly-card">
+                <p class="card-label" id="hourly-summary">Hourly forecast</p>
+                <hr class="card-divider">
+                <div class="hourly-scroll" id="hourly-scroll">
+                    <!-- Hourly items injected by JS -->
                 </div>
-                <p id="weather-description" class="weather-description">--</p>
-                
-                <div class="weather-details">
-                    <div class="detail-box">
-                        <span class="detail-label">Min / Max</span>
-                        <span id="min-max-temp" class="detail-value">--° / --°</span>
-                    </div>
-                    <div class="detail-box">
-                        <span class="detail-label">Humidity</span>
-                        <span id="humidity" class="detail-value">--%</span>
-                    </div>
-                    <div class="detail-box">
-                        <span class="detail-label">Air Speed</span>
-                        <span id="wind-speed" class="detail-value">-- m/s</span>
-                    </div>
+            </section>
+
+            <!-- 5-Day Forecast -->
+            <section class="card forecast-card" id="forecast-card">
+                <p class="card-label"><svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> 5-DAY FORECAST</p>
+                <hr class="card-divider">
+                <div class="forecast-list" id="forecast-list">
+                    <!-- Forecast rows injected by JS -->
                 </div>
-            </div>
-        </main>
+            </section>
+
+            <!-- Detail Cards Grid -->
+            <section class="detail-grid" id="detail-grid">
+                <!-- Sunrise / Sunset -->
+                <div class="card detail-card" id="card-sunrise">
+                    <p class="card-label"><svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/><line x1="23" y1="22" x2="1" y2="22"/><polyline points="8 6 12 2 16 6"/></svg> SUNRISE</p>
+                    <p class="detail-big" id="sunrise-time">--</p>
+                    <p class="detail-sub">Sunset: <span id="sunset-time">--</span></p>
+                </div>
+
+                <!-- Wind -->
+                <div class="card detail-card" id="card-wind">
+                    <p class="card-label"><svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg> WIND</p>
+                    <p class="detail-big" id="wind-speed">-- <span class="detail-unit">m/s</span></p>
+                    <p class="detail-sub">Gusts: <span id="wind-gust">--</span> m/s</p>
+                </div>
+
+                <!-- Feels Like -->
+                <div class="card detail-card" id="card-feelslike">
+                    <p class="card-label"><svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg> FEELS LIKE</p>
+                    <p class="detail-big" id="feels-like">--°</p>
+                    <p class="detail-sub" id="feels-like-desc">--</p>
+                </div>
+
+                <!-- Humidity -->
+                <div class="card detail-card" id="card-humidity">
+                    <p class="card-label"><svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> HUMIDITY</p>
+                    <p class="detail-big" id="humidity">--%</p>
+                    <p class="detail-sub" id="humidity-desc">--</p>
+                </div>
+
+                <!-- Visibility -->
+                <div class="card detail-card" id="card-visibility">
+                    <p class="card-label"><svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> VISIBILITY</p>
+                    <p class="detail-big" id="visibility">-- km</p>
+                    <p class="detail-sub" id="visibility-desc">--</p>
+                </div>
+
+                <!-- Pressure -->
+                <div class="card detail-card" id="card-pressure">
+                    <p class="card-label"><svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> PRESSURE</p>
+                    <p class="detail-big" id="pressure">-- <span class="detail-unit">hPa</span></p>
+                    <p class="detail-sub" id="pressure-desc">--</p>
+                </div>
+            </section>
+        </div>
     </div>
 
-    <!-- Script included at the end of body -->
+    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
