@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dashboard</title>
+    <!-- Use Google Fonts (Inter) for premium typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="search-bar">
+                <input type="text" id="city-input" placeholder="Search a place...">
+                <button id="search-btn" aria-label="Search">🔍</button>
+            </div>
+            <button id="current-location-btn" class="location-btn">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
+                </svg>
+                Current Location
+            </button>
+        </header>
+
+        <main class="weather-content" id="weather-content">
+            <!-- Loading state or initial message will be shown here -->
+            <div class="initial-msg">Type a city or use current location to get weather.</div>
+            
+            <!-- Weather data card, initially hidden -->
+            <div class="weather-card hidden" id="weather-card">
+                <h1 id="city-name" class="city-name">--</h1>
+                <div class="weather-main">
+                    <img id="weather-icon" src="" alt="Weather Icon" class="weather-icon">
+                    <div class="temp-box">
+                        <span id="temperature" class="temperature">--</span><span class="unit">°C</span>
+                    </div>
+                </div>
+                <p id="weather-description" class="weather-description">--</p>
+                
+                <div class="weather-details">
+                    <div class="detail-box">
+                        <span class="detail-label">Min / Max</span>
+                        <span id="min-max-temp" class="detail-value">--° / --°</span>
+                    </div>
+                    <div class="detail-box">
+                        <span class="detail-label">Humidity</span>
+                        <span id="humidity" class="detail-value">--%</span>
+                    </div>
+                    <div class="detail-box">
+                        <span class="detail-label">Air Speed</span>
+                        <span id="wind-speed" class="detail-value">-- m/s</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Script included at the end of body -->
+    <script src="script.js"></script>
+</body>
+</html>
