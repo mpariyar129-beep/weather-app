@@ -1,6 +1,7 @@
-// api/forecast.js
-// Server-side route for 5-day / 3-hour forecast.
-// API key stays on Vercel server — never exposed to browser.
+// forecast.js
+// Vercel Serverless Function — 5-day / 3-hour forecast
+// API key is stored in Vercel Environment Variables (OWM_API_KEY)
+// It never reaches the browser
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
 
   try {
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`;
+
     const response = await fetch(url);
     const data = await response.json();
 
