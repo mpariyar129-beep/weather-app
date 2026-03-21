@@ -1,9 +1,9 @@
-// api/weather.js
-// This runs on Vercel's server — API key is NEVER sent to the browser.
-// Vercel injects OWM_API_KEY from your project's Environment Variables.
+// weather.js
+// Vercel Serverless Function — current weather
+// API key is stored in Vercel Environment Variables (OWM_API_KEY)
+// It never reaches the browser
 
 export default async function handler(req, res) {
-  // Allow cross-origin requests from your own frontend
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
