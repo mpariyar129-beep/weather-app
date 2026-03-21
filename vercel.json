@@ -2,7 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/*.js",
+      "src": "weather.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "forecast.js",
       "use": "@vercel/node"
     },
     {
@@ -19,8 +23,17 @@
     }
   ],
   "routes": [
-    { "src": "/weather", "dest": "/weather.js" },
-    { "src": "/forecast", "dest": "/forecast.js" },
-    { "src": "/(.*)", "dest": "/$1" }
+    {
+      "src": "/weather",
+      "dest": "/weather.js"
+    },
+    {
+      "src": "/forecast",
+      "dest": "/forecast.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
   ]
 }
