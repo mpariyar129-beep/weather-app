@@ -1,297 +1,359 @@
-const API_KEY = typeof CONFIG !== 'undefined' ? CONFIG.API_KEY : "YOUR_API_KEY_HERE";
-const BASE_URL = "https://api.openweathermap.org/data/2.5/weather";
-const FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast";
+let isCelsius = true;
+let lastLat = null;
+let lastLon = null;
 
-// DOM Elements
-const cityInput = document.getElementById("city-input");
-const searchBtn = document.getElementById("search-btn");
-const locBtn = document.getElementById("current-location-btn");
-const initialMsg = document.getElementById("initial-msg");
-const weatherAll = document.getElementById("weather-all");
+// ───────────────────────────────────────────────────────────
+//  FETCH HELPERS  (call OUR Vercel API routes, not OWM directly)
+// ───────────────────────────────────────────────────────────
 
-// Hero
-const cityNameEl = document.getElementById("city-name");
-const tempEl = document.getElementById("temperature");
-const descEl = document.getElementById("weather-description");
-const minMaxEl = document.getElementById("min-max-temp");
-
-// Hourly
-const hourlyScroll = document.getElementById("hourly-scroll");
-const hourlySummary = document.getElementById("hourly-summary");
-
-// Forecast
-const forecastList = document.getElementById("forecast-list");
-
-// Detail cards
-const sunriseEl = document.getElementById("sunrise-time");
-const sunsetEl = document.getElementById("sunset-time");
-const windSpeedEl = document.getElementById("wind-speed");
-const windGustEl = document.getElementById("wind-gust");
-const feelsLikeEl = document.getElementById("feels-like");
-const feelsLikeDescEl = document.getElementById("feels-like-desc");
-const humidityEl = document.getElementById("humidity");
-const humidityDescEl = document.getElementById("humidity-desc");
-const visibilityEl = document.getElementById("visibility");
-const visibilityDescEl = document.getElementById("visibility-desc");
-const pressureEl = document.getElementById("pressure");
-const pressureDescEl = document.getElementById("pressure-desc");
-
-// ============ EVENT LISTENERS ============
-searchBtn.addEventListener("click", () => {
-  const city = cityInput.value.trim();
-  if (city) fetchWeatherByCity(city);
-});
-
-cityInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    const city = cityInput.value.trim();
-    if (city) fetchWeatherByCity(city);
-  }
-});
-
-locBtn.addEventListener("click", () => {
-  if (navigator.geolocation) {
-    showLoading("Getting your location...");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
-      (err) => {
-        const msg = err.code === err.PERMISSION_DENIED
-          ? "Geolocation permission denied. Please enable location services."
-          : "Unable to retrieve your location.";
-        showError(msg);
-      }
-    );
-  } else {
-    showError("Geolocation is not supported by your browser.");
-  }
-});
-
-// ============ API CALLS ============
-async function fetchWeatherByCity(city) {
-  showLoading("Fetching weather data...");
+async function fetchByCity(city) {
+  showLoading();
   try {
-    const res = await fetch(`${BASE_URL}?q=${city}&units=metric&appid=${API_KEY}`);
+    const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
     const data = await res.json();
-    if (data.cod !== 200) throw new Error(data.message || "City not found.");
-    updateCurrentUI(data);
-    fetchForecastByCity(city);
+    if (!res.ok) throw new Error(data.error || "City not found");
+    lastLat = data.coord.lat;
+    lastLon = data.coord.lon;
+    renderCurrent(data);
+    fetchForecast(lastLat, lastLon);
   } catch (err) {
     showError(err.message);
   }
 }
 
-async function fetchWeatherByCoords(lat, lon) {
-  showLoading("Fetching weather data...");
+async function fetchByCoords(lat, lon) {
+  showLoading();
   try {
-    const res = await fetch(`${BASE_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`);
+    const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
     const data = await res.json();
-    if (data.cod !== 200) throw new Error(data.message || "Location not found.");
-    updateCurrentUI(data);
-    fetchForecastByCoords(lat, lon);
+    if (!res.ok)
+      throw new Error(data.error || "Could not get weather for this location");
+    lastLat = lat;
+    lastLon = lon;
+    renderCurrent(data);
+    fetchForecast(lat, lon);
   } catch (err) {
     showError(err.message);
   }
 }
 
-async function fetchForecastByCity(city) {
+async function fetchForecast(lat, lon) {
   try {
-    const res = await fetch(`${FORECAST_URL}?q=${city}&units=metric&appid=${API_KEY}`);
+    const res = await fetch(`/api/forecast?lat=${lat}&lon=${lon}`);
     const data = await res.json();
-    if (data.cod === "200") renderForecastData(data);
-  } catch (err) {
-    console.error("Forecast error:", err);
+    if (!res.ok) throw new Error(data.error || "Forecast unavailable");
+    renderForecast(data);
+  } catch {
+    document.getElementById("weeklyGrid").innerHTML =
+      '<p style="color:var(--muted);font-size:.85rem">Forecast unavailable</p>';
   }
 }
 
-async function fetchForecastByCoords(lat, lon) {
-  try {
-    const res = await fetch(`${FORECAST_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`);
-    const data = await res.json();
-    if (data.cod === "200") renderForecastData(data);
-  } catch (err) {
-    console.error("Forecast error:", err);
-  }
-}
+// ───────────────────────────────────────────────────────────
+//  RENDER — CURRENT WEATHER
+// ───────────────────────────────────────────────────────────
 
-// ============ RENDER: CURRENT WEATHER ============
-function updateCurrentUI(data) {
-  initialMsg.classList.add("hidden");
-  weatherAll.classList.remove("hidden");
+function renderCurrent(d) {
+  hideLoading();
+  hideError();
+  hide("bigEmptyState");
+  hide("placeholderState");
 
-  // Hero
-  cityNameEl.textContent = data.name;
-  tempEl.textContent = `${Math.round(data.main.temp)}°`;
-  descEl.textContent = data.weather[0].description;
-  minMaxEl.textContent = `H:${Math.round(data.main.temp_max)}°  L:${Math.round(data.main.temp_min)}°`;
+  const isDay = d.dt > d.sys.sunrise && d.dt < d.sys.sunset;
+  const icon = weatherIcon(d.weather[0].id, isDay);
+  const dp = calcDewPoint(d.main.temp, d.main.humidity);
+
+  // Sidebar
+  setText("currentCity", d.name);
+  setText("currentCountry", d.sys.country);
+  setText("mainIcon", icon);
+  setText("mainTemp", Math.round(isCelsius ? d.main.temp : toF(d.main.temp)));
+  setText("mainUnit", isCelsius ? "C" : "F");
+  setText("mainCondition", d.weather[0].description);
+  setText("feelsLike", fmtTemp(d.main.feels_like));
+  setText("tempMin", fmtTemp(d.main.temp_min));
+  setText("tempMax", fmtTemp(d.main.temp_max));
+  setText("humidity", `${d.main.humidity}%`);
+  setText("wind", fmtWind(d.wind.speed));
+  setText("visibility", `${(d.visibility / 1000).toFixed(1)} km`);
+  setText("pressure", `${d.main.pressure} hPa`);
+  setText("sunrise", unixToTime(d.sys.sunrise, d.timezone));
+  setText("sunset", unixToTime(d.sys.sunset, d.timezone));
+
+  show("locationDisplay");
+  show("mainWeather");
+  show("sidebarStats");
+
+  // Header
+  setText("mainCityTitle", `${d.name}, ${d.sys.country}`);
+  setText(
+    "countryLabel",
+    `${d.weather[0].description} · ` +
+      new Date().toLocaleDateString("en-GB", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }),
+  );
 
   // Detail cards
-  const sunrise = new Date(data.sys.sunrise * 1000);
-  const sunset = new Date(data.sys.sunset * 1000);
-  sunriseEl.textContent = formatTime(sunrise);
-  sunsetEl.textContent = formatTime(sunset);
+  setText("d-feelsLike", fmtTemp(d.main.feels_like));
+  setText("d-humidity", `${d.main.humidity}%`);
+  setWidth("d-humidityBar", d.main.humidity);
+  setText("d-wind", fmtWind(d.wind.speed));
+  setText("d-windDir", `${degToCompass(d.wind.deg)} (${d.wind.deg}°)`);
+  setText("d-visibility", `${(d.visibility / 1000).toFixed(1)} km`);
+  setText("d-pressure", `${d.main.pressure} hPa`);
+  setText("d-clouds", `${d.clouds.all}%`);
+  setWidth("d-cloudsBar", d.clouds.all);
+  setText("d-dewPoint", fmtTemp(dp));
+  setText("d-coords", `${d.coord.lat.toFixed(4)}°, ${d.coord.lon.toFixed(4)}°`);
 
-  const ws = data.wind.speed;
-  windSpeedEl.innerHTML = `${ws} <span class="detail-unit">m/s</span>`;
-  windGustEl.textContent = data.wind.gust ? data.wind.gust.toFixed(1) : ws.toFixed(1);
-
-  const fl = Math.round(data.main.feels_like);
-  feelsLikeEl.textContent = `${fl}°`;
-  const diff = fl - Math.round(data.main.temp);
-  feelsLikeDescEl.textContent = diff === 0
-    ? "Similar to the actual temperature."
-    : diff > 0
-      ? "Humidity is making it feel warmer."
-      : "Wind is making it feel cooler.";
-
-  humidityEl.textContent = `${data.main.humidity}%`;
-  const dp = data.main.humidity > 70 ? "High" : data.main.humidity > 40 ? "Comfortable" : "Low";
-  humidityDescEl.textContent = `The dew point is ${dp} right now.`;
-
-  const visKm = (data.visibility / 1000).toFixed(1);
-  visibilityEl.textContent = `${visKm} km`;
-  visibilityDescEl.textContent = data.visibility >= 10000
-    ? "Perfectly clear view."
-    : data.visibility >= 5000
-      ? "Moderate visibility."
-      : "Low visibility.";
-
-  pressureEl.innerHTML = `${data.main.pressure} <span class="detail-unit">hPa</span>`;
-  pressureDescEl.textContent = data.main.pressure > 1020
-    ? "High pressure — fair weather expected."
-    : data.main.pressure < 1000
-      ? "Low pressure — unsettled weather possible."
-      : "Standard atmospheric pressure.";
-
-  cityInput.value = "";
+  show("weatherContent");
 }
 
-// ============ RENDER: FORECAST DATA ============
-function renderForecastData(data) {
-  renderHourlyStrip(data);
-  renderDailyForecast(data);
-}
+// ───────────────────────────────────────────────────────────
+//  RENDER — FORECAST (5-day + hourly)
+// ───────────────────────────────────────────────────────────
 
-// — Hourly strip (next 8 entries = next 24 hours) —
-function renderHourlyStrip(data) {
-  hourlyScroll.innerHTML = "";
-  const items = data.list.slice(0, 8);
-
-  // Short summary from first item
-  const firstDesc = items[0].weather[0].description;
-  hourlySummary.textContent = `${capitalize(firstDesc)} expected in the coming hours.`;
-
-  items.forEach((item, idx) => {
-    const date = new Date(item.dt * 1000);
-    const label = idx === 0 ? "Now" : formatHour(date);
-    const iconCode = item.weather[0].icon;
-    const temp = Math.round(item.main.temp);
-
-    const el = document.createElement("div");
-    el.className = "hourly-item";
-    el.innerHTML = `
-      <span class="hourly-time">${label}</span>
-      <img class="hourly-icon" src="https://openweathermap.org/img/wn/${iconCode}.png" alt="icon">
-      <span class="hourly-temp">${temp}°</span>
-    `;
-    hourlyScroll.appendChild(el);
-  });
-}
-
-// — Daily forecast (aggregate 3-hour data into daily min/max) —
-function renderDailyForecast(data) {
-  forecastList.innerHTML = "";
-
-  // Group data by day
-  const dayMap = {};
+function renderForecast(data) {
+  const list = data.list;
   const today = new Date().toDateString();
 
-  for (const item of data.list) {
-    const date = new Date(item.dt * 1000);
-    const dayKey = date.toDateString();
-    if (dayKey === today) continue; // skip today
+  // --- HOURLY (first 10 entries ~30 hrs) ---
+  const strip = document.getElementById("hourlyStrip");
+  strip.innerHTML = "";
 
-    if (!dayMap[dayKey]) {
-      dayMap[dayKey] = {
-        date,
-        temps: [],
-        icon: item.weather[0].icon,
-        noonItem: null,
-      };
-    }
-    dayMap[dayKey].temps.push(item.main.temp);
+  const firstDay = new Date(list[0].dt * 1000).toDateString();
+  const hourlyItems = list
+    .filter(
+      (item) =>
+        new Date(item.dt * 1000).toDateString() === today ||
+        new Date(item.dt * 1000).toDateString() === firstDay,
+    )
+    .slice(0, 10);
 
-    // Prefer icon closest to noon
-    const hours = date.getHours();
-    if (hours >= 11 && hours <= 15) {
-      dayMap[dayKey].icon = item.weather[0].icon;
-      dayMap[dayKey].noonItem = item;
-    }
-  }
+  hourlyItems.forEach((item, i) => {
+    const hour = new Date(item.dt * 1000).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
-  const days = Object.values(dayMap).slice(0, 5);
-  if (days.length === 0) return;
-
-  // Global min/max across all forecast days (for the bar range)
-  let globalMin = Infinity, globalMax = -Infinity;
-  days.forEach(d => {
-    const lo = Math.min(...d.temps);
-    const hi = Math.max(...d.temps);
-    if (lo < globalMin) globalMin = lo;
-    if (hi > globalMax) globalMax = hi;
-  });
-  const range = globalMax - globalMin || 1;
-
-  days.forEach(d => {
-    const dayName = d.date.toLocaleDateString('en-US', { weekday: 'short' });
-    const lo = Math.round(Math.min(...d.temps));
-    const hi = Math.round(Math.max(...d.temps));
-
-    // Position of bar within global range
-    const leftPct = ((Math.min(...d.temps) - globalMin) / range) * 100;
-    const rightPct = ((globalMax - Math.max(...d.temps)) / range) * 100;
-
-    const row = document.createElement("div");
-    row.className = "forecast-row";
-    row.innerHTML = `
-      <span class="forecast-day">${dayName}</span>
-      <img class="forecast-icon" src="https://openweathermap.org/img/wn/${d.icon}.png" alt="icon">
-      <span class="forecast-lo">${lo}°</span>
-      <div class="forecast-bar-container">
-        <div class="forecast-bar" style="left:${leftPct}%;right:${rightPct}%"></div>
-      </div>
-      <span class="forecast-hi">${hi}°</span>
+    const card = document.createElement("div");
+    card.className = `hour-card${i === 0 ? " now" : ""}`;
+    card.innerHTML = `
+      <div class="hour-time">${i === 0 ? "Now" : hour}</div>
+      <div class="hour-icon">${weatherIcon(item.weather[0].id)}</div>
+      <div class="hour-temp">${fmtTemp(item.main.temp)}</div>
+      ${item.pop > 0 ? `<div class="hour-rain">💧${Math.round(item.pop * 100)}%</div>` : ""}
     `;
-    forecastList.appendChild(row);
+    strip.appendChild(card);
   });
+
+  // --- 5-DAY (group by calendar date) ---
+  const grid = document.getElementById("weeklyGrid");
+  grid.innerHTML = "";
+
+  const days = {};
+  list.forEach((item) => {
+    const key = new Date(item.dt * 1000).toDateString();
+    if (!days[key]) days[key] = [];
+    days[key].push(item);
+  });
+
+  Object.entries(days)
+    .slice(0, 5)
+    .forEach(([dayStr, items]) => {
+      // pick midday entry for representative condition
+      const rep =
+        items.find((i) => new Date(i.dt * 1000).getHours() === 12) ||
+        items[Math.floor(items.length / 2)];
+      const high = Math.max(...items.map((i) => i.main.temp_max));
+      const low = Math.min(...items.map((i) => i.main.temp_min));
+      const maxPop = Math.max(...items.map((i) => i.pop || 0));
+      const dayName = new Date(dayStr).toLocaleDateString("en-GB", {
+        weekday: "short",
+      });
+
+      const card = document.createElement("div");
+      card.className = "day-card";
+      card.innerHTML = `
+      <div class="day-name">${dayName}</div>
+      <div class="day-icon">${weatherIcon(rep.weather[0].id)}</div>
+      <div class="day-desc">${rep.weather[0].description}</div>
+      <div class="day-high">${fmtTemp(high)}</div>
+      <div class="day-low">${fmtTemp(low)}</div>
+      ${maxPop > 0 ? `<div class="day-rain">💧${Math.round(maxPop * 100)}%</div>` : ""}
+    `;
+      grid.appendChild(card);
+    });
 }
 
-// ============ HELPERS ============
-function showLoading(msg) {
-  weatherAll.classList.add("hidden");
-  initialMsg.classList.remove("hidden", "error-msg");
-  initialMsg.textContent = msg;
+// ───────────────────────────────────────────────────────────
+//  EVENTS
+// ───────────────────────────────────────────────────────────
+
+// Search form
+document.getElementById("searchForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const city = document.getElementById("searchInput").value.trim();
+  if (city) {
+    fetchByCity(city);
+    document.getElementById("searchInput").value = "";
+  }
+});
+
+// Geolocation
+document.getElementById("locationBtn").addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    showError("Geolocation is not supported by your browser.");
+    return;
+  }
+  showLoading();
+  navigator.geolocation.getCurrentPosition(
+    (pos) => fetchByCoords(pos.coords.latitude, pos.coords.longitude),
+    () => showError("Location access denied. Please search manually."),
+  );
+});
+
+// °C / °F toggle
+document.getElementById("celsiusBtn").addEventListener("click", () => {
+  if (isCelsius) return;
+  isCelsius = true;
+  document.getElementById("celsiusBtn").classList.add("active");
+  document.getElementById("fahrenheitBtn").classList.remove("active");
+  if (lastLat !== null) fetchByCoords(lastLat, lastLon);
+});
+document.getElementById("fahrenheitBtn").addEventListener("click", () => {
+  if (!isCelsius) return;
+  isCelsius = false;
+  document.getElementById("fahrenheitBtn").classList.add("active");
+  document.getElementById("celsiusBtn").classList.remove("active");
+  if (lastLat !== null) fetchByCoords(lastLat, lastLon);
+});
+
+// ───────────────────────────────────────────────────────────
+//  UI HELPERS
+// ───────────────────────────────────────────────────────────
+
+function showLoading() {
+  document.getElementById("loading").style.display = "flex";
+  hide("errorMsg");
+  hide("weatherContent");
+  hide("bigEmptyState");
+}
+function hideLoading() {
+  hide("loading");
 }
 
 function showError(msg) {
-  weatherAll.classList.add("hidden");
-  initialMsg.classList.remove("hidden");
-  initialMsg.classList.add("error-msg");
-
-  if (msg.includes("Invalid API key") || msg.includes("401")) {
-    initialMsg.textContent = "Please set your OpenWeather API key in config.js";
-  } else {
-    initialMsg.textContent = capitalize(msg);
-  }
+  hideLoading();
+  const el = document.getElementById("errorMsg");
+  el.textContent = `⚠️ ${msg}`;
+  el.style.display = "block";
+  show("bigEmptyState");
+}
+function hideError() {
+  hide("errorMsg");
 }
 
-function formatTime(date) {
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+function hide(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = "none";
+}
+function show(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = "";
+}
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+function setWidth(id, pct) {
+  const el = document.getElementById(id);
+  if (el) el.style.width = pct + "%";
 }
 
-function formatHour(date) {
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+// ───────────────────────────────────────────────────────────
+//  MATH & FORMATTING
+// ───────────────────────────────────────────────────────────
+
+function toF(c) {
+  return (c * 9) / 5 + 32;
+}
+function fmtTemp(c) {
+  return isCelsius ? `${Math.round(c)}°C` : `${Math.round(toF(c))}°F`;
+}
+function fmtWind(ms) {
+  return isCelsius
+    ? `${(ms * 3.6).toFixed(1)} km/h`
+    : `${(ms * 2.237).toFixed(1)} mph`;
 }
 
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+function degToCompass(deg) {
+  const dirs = [
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
+  ];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+function calcDewPoint(tempC, humidity) {
+  const a = 17.27,
+    b = 237.7;
+  const alpha = (a * tempC) / (b + tempC) + Math.log(humidity / 100);
+  return (b * alpha) / (a - alpha);
+}
+
+function unixToTime(unix, tzOffset) {
+  return new Date((unix + tzOffset) * 1000).toUTCString().slice(17, 22);
+}
+
+function weatherIcon(id, isDay = true) {
+  if (id >= 200 && id < 300) return "⛈️";
+  if (id >= 300 && id < 400) return "🌦️";
+  if (id === 500) return "🌧️";
+  if (id >= 501 && id < 600) return "⛈️";
+  if (id >= 600 && id < 700) return "❄️";
+  if (id >= 700 && id < 800) return "🌫️";
+  if (id === 800) return isDay ? "☀️" : "🌙";
+  if (id === 801) return "🌤️";
+  if (id === 802) return "⛅";
+  if (id >= 803) return "☁️";
+  return "🌡️";
+}
+
+// ───────────────────────────────────────────────────────────
+//  INIT
+// ───────────────────────────────────────────────────────────
+
+// Set sidebar date
+document.getElementById("sidebarDate").textContent =
+  new Date().toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+// Auto-detect location on load
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => fetchByCoords(pos.coords.latitude, pos.coords.longitude),
+    () => {}, // silent — user can search manually
+  );
 }
