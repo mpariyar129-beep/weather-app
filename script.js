@@ -9,7 +9,7 @@ let lastLon = null;
 async function fetchByCity(city) {
   showLoading();
   try {
-    const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+    const res = await fetch(`/weather?city=${encodeURIComponent(city)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "City not found");
     lastLat = data.coord.lat;
@@ -24,7 +24,7 @@ async function fetchByCity(city) {
 async function fetchByCoords(lat, lon) {
   showLoading();
   try {
-    const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+    const res = await fetch(`/weather?lat=${lat}&lon=${lon}`);
     const data = await res.json();
     if (!res.ok)
       throw new Error(data.error || "Could not get weather for this location");
@@ -39,7 +39,7 @@ async function fetchByCoords(lat, lon) {
 
 async function fetchForecast(lat, lon) {
   try {
-    const res = await fetch(`/api/forecast?lat=${lat}&lon=${lon}`);
+    const res = await fetch(`/forecast?lat=${lat}&lon=${lon}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Forecast unavailable");
     renderForecast(data);
